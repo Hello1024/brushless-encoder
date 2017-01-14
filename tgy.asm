@@ -197,7 +197,7 @@
 .equ	CELL_MIN_DV	= 35	; Minimum battery cell deciV
 .equ	CELL_COUNT	= 0	; 0: auto, >0: hard-coded number of cells (for reliable LVC > ~4S)
 .equ	BLIP_CELL_COUNT	= 0	; Blip out cell count before arming
-.equ	DEBUG_ADC_DUMP	= 0	; Output an endless loop of all ADC values (no normal operation)
+.equ	DEBUG_ADC_DUMP	= 1	; Output an endless loop of all ADC values (no normal operation)
 .equ	MOTOR_DEBUG	= 0	; Output sync pulses on MOSI or SCK, debug flag on MISO
 
 .equ	I2C_ADDR	= 0x50	; MK-style I2C address
@@ -1776,6 +1776,7 @@ beep_f1_on:	BpFET_on
 		brne	beep_f1_on
 		BLUE_off
 		RED_off
+		rjmp beep_f1
 		ret
 
 beep_f2:	ldi	temp2, 100
@@ -1788,6 +1789,7 @@ beep_f2_on:	CpFET_on
 		brne	beep_f2_on
 		BLUE_off
 		GRN_off
+		rjmp beep_f1
 		ret
 
 beep_f3:	ldi	temp2, 120
@@ -1798,6 +1800,7 @@ beep_f3_on:	ApFET_on
 		rcall	beep
 		brne	beep_f3_on
 		BLUE_off
+		rjmp beep_f1
 		ret
 
 beep_f4:	ldi	temp2, 140
@@ -1812,6 +1815,7 @@ beep_f4_on:	CpFET_on
 		BLUE_off
 		GRN_off
 		RED_off
+		rjmp beep_f1
 		ret
 
 		; Fall through
@@ -1823,7 +1827,7 @@ beep1:		in	temp1, TCNT0
 		cpi	temp1, 2*CPU_MHZ	; 32µs on
 		brlo	beep1
 		all_pFETs_off temp3
-		all_nFETs_off temp3
+		; all_nFETs_off temp3
 		ldi	temp3, CPU_MHZ
 beep2:		out	TCNT0, ZH
 		wdr
@@ -2178,7 +2182,24 @@ hw_error_ret:	ret
 .set DEBUG_TX = 1
 .set ADC_READ_NEEDED = 1
 
+; Inputs:
+;  temp1 ->  delay time
+;  temp4 ->  adc input to sense  (4 will toggle fet pB, 5 will toggle fet pC)
+; Returns:
+;  adc value after delay time.
+record_reverse_bias_time:
+		rcall	adc_read
+		
+
+
+
+
 adc_input_dump:
+              ldi	i_temp1, 100
+		ldi	i_temp2, 100
+		mov    temp5, temp1
+		mov    temp6, temp1
+		
 		ldi	temp4, 27
 		rcall	tx_byte
 		ldi	temp4, '['
@@ -2189,45 +2210,58 @@ adc_input_dump:
 		rcall	tx_byte
 
 adc_input_dump1:
-		ldi	temp2, 5
-		rcall	wait1
-		ldi	temp4, 27
-		rcall	tx_byte
-		ldi	temp4, '['
-		rcall	tx_byte
-		ldi	temp4, 'H'
-		rcall	tx_byte
-
-		.if defined(mux_a)
-		ldi	temp4, 'A'
-		rcall	tx_byte
-		ldi	temp4, mux_a
+              
+		
+		AnFET_on
+		mov    temp1, i_temp1
+		ldi    temp4, 4
 		rcall	adc_read
-		rcall	colon_hex_write
-		.endif
-		.if defined(mux_b)
-		ldi	temp4, 'B'
+		add    i_temp1, temp1
+              mov    temp3, i_temp1
+		rcall	tx_hex_byte
+		ldi	temp4, ','
 		rcall	tx_byte
-		ldi	temp4, mux_b
+		
+		CnFET_on
+		mov    temp1, i_temp2
+		ldi    temp4, 4
 		rcall	adc_read
-		rcall	colon_hex_write
-		.endif
-		.if defined(mux_c)
-		ldi	temp4, 'C'
+		add    i_temp2, temp1
+              mov    temp3, i_temp2
+		rcall	tx_hex_byte
+		ldi	temp4, ','
 		rcall	tx_byte
-		ldi	temp4, mux_c
+		
+		BnFET_on
+		mov    temp1, temp5
+		ldi    temp4, 5
 		rcall	adc_read
-		rcall	colon_hex_write
-		.endif
-		.if defined(mux_voltage)
-		ldi	temp4, '#'
+		add    temp5, temp1
+              mov    temp3, temp5
+		rcall	tx_hex_byte
+		ldi	temp4, ','
 		rcall	tx_byte
-		rcall	adc_cell_count
-		clr	temp2
-		rcall	colon_hex_write
-		.endif
-
+		
+		CnFET_on
+		mov    temp1, temp6
+		ldi    temp4, 5
+		rcall	adc_read
+		add    temp6, temp1
+              mov    temp3, temp6
+		rcall	tx_hex_byte
+		ldi	temp4, ','
+		rcall	tx_byte
+		
+		rcall	lookup
+		rcall	tx_hex_byte
+		;ldi	temp4, ','
+		;rcall	tx_byte
+		
+		
 		rcall	tx_crlf
+		rjmp adc_input_dump1
+		
+
 
 		clr	YL
 adc_loop:
@@ -2240,10 +2274,7 @@ adc_loop:
 		mov	temp4, YL
 		rcall	tx_hex_nibble
 
-		mov	temp4, YL
-		rcall	adc_read
-		rcall	colon_hex_write
-
+		
 		inc	YL
 		andi	YL, 0xf
 		breq	adc_input_dump1
@@ -2253,6 +2284,49 @@ adc_loop:
 		rjmp	adc_loop
 
 		ret
+lookup:
+		ldi ZL, LOW(data_table << 1)  ; load Z = address of my_array
+		ldi ZH, HIGH(data_table << 1)  ; ...high byte also
+		ldi temp4, 0
+		ldi temp3, 0xFF
+
+next_lookup:		
+		lpm temp1, Z+
+		sub temp1, i_temp1
+		sbrc temp1, 7
+		com temp1
+		mov temp2, temp1
+		
+		lpm temp1, Z+
+		sub temp1, i_temp2
+		sbrc temp1, 7
+		com temp1
+		add temp2, temp1
+		
+		lpm temp1, Z+
+		sub temp1, temp5
+		sbrc temp1, 7
+		com temp1
+		add temp2, temp1
+		
+		lpm temp1, Z+
+		sub temp1, temp6
+		sbrc temp1, 7
+		com temp1
+		add temp2, temp1
+		
+		; check for best
+		cp temp2, temp3
+		brsh no_new_best
+new_best:
+		mov temp3, temp2
+		mov timing_duty_h, temp4
+no_new_best:	dec temp4
+              brne next_lookup
+              mov temp3, timing_duty_h
+              
+              ldi ZH, 0
+		ret
 .endif
 
 .if DEBUG_TX
@@ -2261,7 +2335,7 @@ init_debug_tx:
 .error "Cannot use UART TX with this pin configuration"
 .endif
 	; Initialize TX for debugging on boards with free TX pin
-		.equ	D_BAUD_RATE = 38400
+		.equ	D_BAUD_RATE = 19200
 		.equ	D_UBRR_VAL = F_CPU / D_BAUD_RATE / 16 - 1
 		outi	UBRRH, high(D_UBRR_VAL), temp1
 		outi	UBRRL, low(D_UBRR_VAL), temp1
@@ -2304,12 +2378,12 @@ tx_colonhex:
 		rjmp	tx_byte
 
 colon_hex_write:
-		rcall	tx_colonhex
 		mov	temp3, temp2
 		rcall	tx_hex_byte
 		mov	temp3, temp1
 		rcall	tx_hex_byte
-		rjmp	tx_crlf
+		ldi	temp4, ','
+		rjmp	tx_byte
 .endif
 
 ;-- Battery cell count ---------------------------------------------------
@@ -2351,16 +2425,44 @@ adc_cell_count:
 ; and REFS1 set) can only be enabled if AVcc is NOT bridged.
 adc_read:
 		out	SFIOR, ZH		; Disable the Analog Comparator Multiplexer
-		sbr	temp4, (1<<REFS0)	; Enable AVCC (5.0V) reference
+		sbr	temp4, (1<<REFS0)	; Enable AVCC (5.0V) reference, input 4
 		out	ADMUX, temp4		; Set ADC channel, AVcc reference with cap at AREF (should be safe if bridged)
-		ldi	temp1, (1<<ADEN)+(1<<ADSC)+(1<<ADPS2)+(1<<ADPS1)+(1<<ADPS0)
-		out	ADCSRA, temp1		; Enable the ADC, start conversion
+		ldi	temp3, (1<<ADEN)+(1<<ADSC)+(1<<ADPS2)+(1<<ADPS1)+(1<<ADPS0)
+		out	ADCSRA, temp3		; Enable the ADC, start conversion
 		wdr				; Will wait 25*128 cycles
+		
+		sbi	DDRD, 6
+		sbi	PORTD, 6		; Drive AIN0 high
+
+adc_wait_start:
+		dec	temp1
+		nop
+		brne	adc_wait_start
+		
+		cpi	temp4, 4 + (1<<REFS0)
+		breq   bfet
+cfet:		ApFET_on
+		rjmp fets_on
+bfet:		BpFET_on
+		rjmp fets_on
+fets_on:	out	TCNT0, ZH
+adc_on_wait:	in	temp1, TCNT0
+		cpi	temp1, 2*CPU_MHZ	; 32µs on
+		brlo	adc_on_wait
+		all_pFETs_off temp1
+		
 adc_wait:	sbic	ADCSRA, ADSC
 		rjmp	adc_wait
+		all_nFETs_off temp1
+
 		in	temp1, ADCL
 		in	temp2, ADCH
 		out	ADCSRA, ZH		; Disable the ADC (next enable and sample will take 25 ADC cycles)
+		cpi    temp1, 200
+		brge   ret1
+		ldi    temp1, 0xFF
+		ret
+ret1:         ldi    temp1, 0x1		 
 		ret
 .endif
 
@@ -4085,6 +4187,9 @@ wait_startup1:	rcall	set_ocr1a_rel
 
 ;-----bko-----------------------------------------------------------------
 ; init after reset
+
+data_table:
+.include "lookup2.inc"
 
 ; The reset vector points here, right at the end of the main program.
 ; This nop-sleds to the boot loader if the program flash was incomplete.
