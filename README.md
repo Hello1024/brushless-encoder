@@ -66,6 +66,7 @@ Improvements
  * **Have a momentum model in the table lookup**:  The current position search assumes the motor position could be random at every sample.  A momentum model would make it significantly more accurate with ambiguous inputs (especially multi-pole motors where each pole is slightly, but not sufficiently different)
  * **Allow simultaniously applying torque to the motor**:  This is complex and would require a model which can quickly apply a PWM pulse to get the motor current down very low, then measure it dissipate, then another pulse to bring it back to operating current.    Alternatively, an alternate mode of operation is to measure variation in operating motor current through measuring voltage drop across the R_DSON of the MOSFETS, but the ADC likley doesn't have sufficient resolution for this.
  * **Combine this method with zero crossing detection for fast spinning motors**:  When a motor is moving fast, it's back-EMF is considerable and easy to detect, which allows accurate phase measurements.   My method is good for very slow movements/stationary where the back-EMF is undetectable.  A smart model would blend both.
+ * **Make it easy to use**:  Make this flashable with standard bootloaders, and make it output data via the PWM input pin rather than requiring soldering on a TX pin.
 
 
 Development
