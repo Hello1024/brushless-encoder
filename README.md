@@ -22,7 +22,7 @@ Getting Started
 
 1.  Get a brushless DC motor and motor controller (ESC) compatible with `tgy.hex` from SimonK (list of controllers is [here](https://docs.google.com/spreadsheet/ccc?key=0AhR02IDNb7_MdEhfVjk3MkRHVzhKdjU1YzdBQkZZRlE))
 
-2.  Make sure you can flash the firmware (directly, the bootloader is untested), and have access to the microprocessors Port D2 (TXD) pin to get outputs out in serial form.   I used an arduino (File > Examples > ArduinoISP) to do the flashing, but other programmers will work with modification.   Hook up the ESC to the motor and a 6-12 volt power supply *with a 10 ohm series resistor for safety*.
+2.  Make sure you can flash the firmware (directly, the bootloader is untested), and have access to the microprocessors Port D2 (TXD) pin to get outputs out in serial form.   I used an arduino (File > Examples > ArduinoISP) to do the flashing, but other programmers will work with modification.   Hook up the ESC to the motor and a 6-12 volt power supply *with a 5 - 10 ohm series resistor for safety*.
 
 3.  You need a linux machine to build on (cygwin windows or mac may work, but untested).  Run `sudo apt-get install build-essential avrdude avra`.
 

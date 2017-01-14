@@ -25,7 +25,7 @@ lookup2.inc: lookup2.csv
 test: all
 
 clean:
-	-rm -f $(ALL_TARGETS) *.cof *.obj *.eep.hex *.eeprom
+	-rm -f $(ALL_TARGETS) *.cof *.obj *.eep.hex *.eeprom lookup2.inc
 
 binary_zip: $(ALL_TARGETS)
 	TARGET="tgy_`date '+%Y-%m-%d'`_`git rev-parse --verify --short HEAD`"; \
